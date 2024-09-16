@@ -177,12 +177,17 @@ class SharepointerSelenium:
         # A janela abrirá, mas o upload será feito diretamente pelo html
         upload_element = self._wait_by_xpath(f"//input[@type='file']")
 
+        def _get_absolute_path(path):
+            return str(Path(path).resolve())
+
         if type(local_files_path) == str:
+            local_files_path = _get_absolute_path(local_files_path)
             upload_element.send_keys(local_files_path)
             success_xpath = '//label[contains(@class, "od-Notify-message")]'
             replace_button = self._replace_file_button
             keep_button = self._keep_both_file_button
         elif type(local_files_path) == list:
+            local_files_path = [_get_absolute_path(path) for path in local_files_path]
             upload_element.send_keys('\n'.join(local_files_path))
             success_xpath = '//div[contains(@class, "title_7bf3db39")]'
             replace_button = self._replace_all_button
@@ -295,6 +300,7 @@ class SharepointerSelenium:
         password_input = self._wait_by_element_name('passwd', 20)
         password_input.clear() # Limpa cache da senha
         password_input.send_keys(self.password)
+        time.sleep(.5) # Garantir inserção da senha
         password_input.send_keys(Keys.ENTER)
         time.sleep(.5) # Tempo para não capturar mensagem existente
         try:
