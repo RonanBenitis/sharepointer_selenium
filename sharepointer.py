@@ -183,26 +183,37 @@ class SharepointerSelenium:
             return str(Path(path).resolve())
 
         def _configure_upload_settings(local_files_path: str | WindowsPath | list) -> tuple:
+
+            def _calculate_timeout(num_files: int, min_time_out: float, max_time_out: float, increment_per_file: float) -> float:
+                time_out = min_time_out + (num_files - 1) * increment_per_file
+                return min(max(time_out, min_time_out), max_time_out)
+
+            MIN_TIME_OUT = 3
+            MAX_TIME_OUT = 30
+            INCREMENT_PER_FILE = 1
+
             if isinstance(local_files_path, (str, WindowsPath)) or (isinstance(local_files_path, list) and len(local_files_path) == 1):
                 local_files_path = _get_absolute_path(local_files_path[0] if isinstance(local_files_path, list) else local_files_path)
                 success_xpath = self._SUCCESS_SINGLE_ALERT_XPATH
                 replace_button = self._REPLACE_FILE_BUTTON
                 keep_button = self._KEEP_BOTH_FILE_BUTTON
+                file_exists_time_out = MIN_TIME_OUT
             else:
                 local_files_path = [_get_absolute_path(path) for path in local_files_path]
                 success_xpath = self._SUCCESS_MULTIPLE_ALERT_XPATH
                 replace_button = self._REPLACE_ALL_BUTTON
                 keep_button = self._KEEP_ALL_FILE_BUTTON
+                file_exists_time_out = _calculate_timeout(len(local_files_path), MIN_TIME_OUT, MAX_TIME_OUT, INCREMENT_PER_FILE)
             
-            return local_files_path, success_xpath, replace_button, keep_button
+            return local_files_path, success_xpath, replace_button, keep_button, file_exists_time_out
 
-        local_files_path, success_xpath, replace_button, keep_button = _configure_upload_settings(local_files_path)
+        local_files_path, success_xpath, replace_button, keep_button, file_exists_time_out = _configure_upload_settings(local_files_path)
         upload_element.send_keys(local_files_path if isinstance(local_files_path, str) else '\n'.join(local_files_path))
 
         # Caso encontrar arquivos de mesmo nome
         try:
             # Alerta de arquivo existente
-            self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=1)
+            self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=file_exists_time_out)
             
             if replace == None:
                 replace = self._input_replace()
@@ -252,7 +263,7 @@ class SharepointerSelenium:
         self._REPLACE_ALL_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace all"]', self._driver)
         self._SUCCESS_SINGLE_ALERT_XPATH = '//label[contains(@class, "od-Notify-message")]'
         self._SUCCESS_MULTIPLE_ALERT_XPATH = '//div[contains(@class, "title_7bf3db39")]'
-        self._FILE_EXISTS_ALERT_XPATH = '//span[@data-automationid="splitbuttonprimary"]'
+        self._FILE_EXISTS_ALERT_XPATH = '//span[@data-automationid="splitbuttonprimary" and contains(text(), "Keep")]'
 
     def _login(self):
         self._driver.get(self._sharepoint_url)
