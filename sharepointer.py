@@ -1,6 +1,7 @@
 import time
 import getpass
 from pathlib import Path
+from pathlib import WindowsPath
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
@@ -12,7 +13,7 @@ from selenium.webdriver.edge.options import Options
 
 class SharepointerSelenium:
     
-    def __init__(self, sharepoint_url: str, edge_webdriver_path: str, username: str = None, password: str = None, download_dir: str = None):
+    def __init__(self, sharepoint_url: str, username: str = None, password: str = None, download_dir: str = None):
         '''
         # Descrição
         Objeto de classe para acesso e manipulação de documentos no Sharepoint.
@@ -23,11 +24,6 @@ class SharepointerSelenium:
             - Endereço base do sharepoint
             - **exemplo de parametro:**
             https://nomedosharepoint.sharepoint.com
-        
-        edge_webdriver_path : string
-            - Caminho do executável do webdriver, no caso, do navegador Edge
-            - Link do download do webdrive: 
-            https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/?form=MA13LH
 
         username : string (opcional)
             - Seu e-mail de usuário
@@ -48,14 +44,20 @@ class SharepointerSelenium:
         self._password = password
         self._sharepoint_url = sharepoint_url.rstrip('/')
         self._logged = False
-        self._edge_webdriver_path = edge_webdriver_path
         self._download_dir = str(Path(__file__).parent / 'downloads') if download_dir is None else download_dir
+
+        # Coletando e validando webdriver edge
+        webdriver_dir = Path(__file__).parent / 'webdriver'
+        self._edge_webdriver_path = str(next((f for f in webdriver_dir.glob('*.exe') if 'edge' in f.name.lower()), None))
+
+        if self._edge_webdriver_path is None:
+            raise FileNotFoundError('Nenhum webdriver "edge" foi encontrado no diretório "webdriver"')
 
         # Gerando driver
         self._driver = self._initizalize_edge_drive()
 
         # Configurando botões
-        self._initialize_buttons()
+        self._initialize_buttons_and_elements()
 
     @property
     def username(self):
@@ -119,19 +121,19 @@ class SharepointerSelenium:
         file_name_with_ext = self._increment_file_name(file_name_with_ext)
 
         try:
-            self._more_button.click()
+            self._MORE_BUTTON.click()
         except TimeoutException:
             print('Botão more não encontrado')
             pass
 
-        self._download_button.click()
+        self._DOWNLOAD_BUTTON.click()
 
         if self._wait_for_file_download(file_name_with_ext, wait_download_time):
             print(f'Download do arquivo {file_name_with_ext} concluído.')
         else:
             print(f'Tempo esgotado para o download do arquivo {file_name_with_ext}')
 
-    def upload_file(self, local_files_path: str | list, sharepoint_folder_url: str, replace: bool = None, wait_upload_time: int = 60) -> None:
+    def upload_file(self, local_files_path: str | WindowsPath | list, sharepoint_folder_url: str, replace: bool = None, wait_upload_time: int = 60) -> None:
         '''
         # Descrição
         Realiza o upload de um ou mais arquivos a um Sharepoint específico
@@ -171,8 +173,8 @@ class SharepointerSelenium:
             self._login()
         
         self._driver.get(sharepoint_folder_url)
-        self._upload_button.click()
-        self._upload_file_button.click()
+        self._UPLOAD_BUTTON.click()
+        self._UPLOAD_FILE_BUTTON.click()
         # NOTE O campo input só aparece após clicar no upload files
         # A janela abrirá, mas o upload será feito diretamente pelo html
         upload_element = self._wait_by_xpath(f"//input[@type='file']")
@@ -180,23 +182,27 @@ class SharepointerSelenium:
         def _get_absolute_path(path):
             return str(Path(path).resolve())
 
-        if type(local_files_path) == str:
-            local_files_path = _get_absolute_path(local_files_path)
-            upload_element.send_keys(local_files_path)
-            success_xpath = '//label[contains(@class, "od-Notify-message")]'
-            replace_button = self._replace_file_button
-            keep_button = self._keep_both_file_button
-        elif type(local_files_path) == list:
-            local_files_path = [_get_absolute_path(path) for path in local_files_path]
-            upload_element.send_keys('\n'.join(local_files_path))
-            success_xpath = '//div[contains(@class, "title_7bf3db39")]'
-            replace_button = self._replace_all_button
-            keep_button = self._keep_all_file_button
+        def _configure_upload_settings(local_files_path: str | WindowsPath | list) -> tuple:
+            if isinstance(local_files_path, (str, WindowsPath)) or (isinstance(local_files_path, list) and len(local_files_path) == 1):
+                local_files_path = _get_absolute_path(local_files_path[0] if isinstance(local_files_path, list) else local_files_path)
+                success_xpath = self._SUCCESS_SINGLE_ALERT_XPATH
+                replace_button = self._REPLACE_FILE_BUTTON
+                keep_button = self._KEEP_BOTH_FILE_BUTTON
+            else:
+                local_files_path = [_get_absolute_path(path) for path in local_files_path]
+                success_xpath = self._SUCCESS_MULTIPLE_ALERT_XPATH
+                replace_button = self._REPLACE_ALL_BUTTON
+                keep_button = self._KEEP_ALL_FILE_BUTTON
+            
+            return local_files_path, success_xpath, replace_button, keep_button
+
+        local_files_path, success_xpath, replace_button, keep_button = _configure_upload_settings(local_files_path)
+        upload_element.send_keys(local_files_path if isinstance(local_files_path, str) else '\n'.join(local_files_path))
 
         # Caso encontrar arquivos de mesmo nome
         try:
             # Alerta de arquivo existente
-            self._wait_by_xpath('//div[@data-automationid="ListCell"]', time_out=1)
+            self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=1)
             
             if replace == None:
                 replace = self._input_replace()
@@ -207,7 +213,7 @@ class SharepointerSelenium:
                 keep_button.click()
         except:
             pass
-        
+
         if self._wait_for_file_upload(success_xpath, wait_upload_time):
             print(f'Upload do(s) arquivo(s) concluído(s).')
         else:
@@ -235,15 +241,18 @@ class SharepointerSelenium:
         # Gerando driver
         return webdriver.Edge(service=Service(self._edge_webdriver_path), options=edge_options)
     
-    def _initialize_buttons(self):
-        self._download_button = _ElementClickXpath(f'//button[@data-automationid="downloadCommand"]', self._driver)
-        self._upload_button = _ElementClickXpath(f'//button[@data-automationid="uploadCommand"]', self._driver)
-        self._upload_file_button = _ElementClickXpath(f'//span[contains(@class, "ms-ContextualMenu-itemText") and text()="Files"]', self._driver)
-        self._more_button = _ElementClickXpath(f'//i[@data-icon-name="More"]', self._driver)
-        self._keep_both_file_button = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Keep both"]', self._driver)
-        self._keep_all_file_button = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Keep all"]', self._driver)
-        self._replace_file_button = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace"]', self._driver)
-        self._replace_all_button = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace all"]', self._driver)
+    def _initialize_buttons_and_elements(self):
+        self._DOWNLOAD_BUTTON = _ElementClickXpath(f'//button[@data-automationid="downloadCommand"]', self._driver)
+        self._UPLOAD_BUTTON = _ElementClickXpath(f'//button[@data-automationid="uploadCommand"]', self._driver)
+        self._UPLOAD_FILE_BUTTON = _ElementClickXpath(f'//span[contains(@class, "ms-ContextualMenu-itemText") and text()="Files"]', self._driver)
+        self._MORE_BUTTON = _ElementClickXpath(f'//i[@data-icon-name="More"]', self._driver)
+        self._KEEP_BOTH_FILE_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Keep both"]', self._driver)
+        self._KEEP_ALL_FILE_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Keep all"]', self._driver)
+        self._REPLACE_FILE_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace"]', self._driver)
+        self._REPLACE_ALL_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace all"]', self._driver)
+        self._SUCCESS_SINGLE_ALERT_XPATH = '//label[contains(@class, "od-Notify-message")]'
+        self._SUCCESS_MULTIPLE_ALERT_XPATH = '//div[contains(@class, "title_7bf3db39")]'
+        self._FILE_EXISTS_ALERT_XPATH = '//span[@data-automationid="splitbuttonprimary"]'
 
     def _login(self):
         self._driver.get(self._sharepoint_url)
@@ -321,7 +330,7 @@ class SharepointerSelenium:
             print(f"Erro ao fechar o driver: {e}")
 
         self._driver = self._initizalize_edge_drive()
-        self._initialize_buttons()
+        self._initialize_buttons_and_elements()
         self._login() 
 
     def _wait_by_id(self, id_name: str, time_out: int = 10):
@@ -357,7 +366,7 @@ class SharepointerSelenium:
 
         while time.time() < end_time:
             try:
-                self._wait_by_xpath(success_xpath, time_out)
+                self._wait_by_xpath(success_xpath)
                 return True
             except:
                 pass
