@@ -58,12 +58,11 @@ from sharepointer_selenium import SharepointerSelenium
 
 # Configurações iniciais
 sharepoint_url = 'https://nomedosharepoint.sharepoint.com'
-webdriver_path = 'caminho/para/msedgedriver.exe'
 username = 'seu-email@dominio.com'
 password = 'sua-senha'
 
 # Instanciando o objeto Sharepointer
-sharepoint = SharepointerSelenium(sharepoint_url, webdriver_path, username, password)
+sharepoint = SharepointerSelenium(sharepoint_url, username, password)
 
 # Realizar download de um arquivo
 sharepoint.download_file('https://nomedosharepoint.sharepoint.com/pasta', 'documento.xlsx')
@@ -74,10 +73,9 @@ sharepoint.upload_file(['arquivo1.txt', 'arquivo2.txt'], 'https://nomedosharepoi
 
 ## Parâmetros da Classe
 
-### `__init__(self, sharepoint_url: str, edge_webdriver_path: str, username: str = None, password: str = None, download_dir: str = None)`
+### `__init__(self, sharepoint_url: str, username: str = None, password: str = None, download_dir: str = None)`
 
 - `sharepoint_url`: URL base do SharePoint.
-- `edge_webdriver_path`: Caminho para o executável do WebDriver do Edge.
 - `username` (opcional): Seu e-mail para login no SharePoint.
   - Caso username não for passado via código, o programa solicitará via terminal
 - `password` (opcional): Sua senha para login no SharePoint.
@@ -95,7 +93,7 @@ Realiza o download de um arquivo específico do SharePoint.
 - `file_name_with_ext`: Nome do arquivo (incluindo a extensão) que deseja baixar.
 - `wait_download_time` (opcional): Tempo máximo de espera para o download, em segundos (padrão: 60).
 
-#### `upload_file(local_files_path: str | list, sharepoint_folder_url: str, replace: bool = None, wait_upload_time: int = 60)`
+#### `upload_file(local_files_path: str | WindowsPath (pathlib) | list, sharepoint_folder_url: str, replace: bool = None, wait_upload_time: int = 60)`
 
 Faz o upload de um ou mais arquivos para o SharePoint.
 
@@ -108,3 +106,4 @@ Faz o upload de um ou mais arquivos para o SharePoint.
 - Caso opte por utilizar as credenciais via código, é recomendável utilizar variáveis de ambiente para definir a senha (.env), por questões de segurança.
 - Caso as credenciais não sejam válidas, o programa solicitará novos dados para o login.
 - Para mais informações, as principais funcionalidades do código estão documentadas, também, via docstring.
+- Esta aplicação aceita parametros utilizando pathlib para upload, seja em lista ou seja unitariamente.
