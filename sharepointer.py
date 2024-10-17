@@ -257,13 +257,13 @@ class SharepointerSelenium:
         self._UPLOAD_BUTTON = _ElementClickXpath(f'//button[@data-automationid="uploadCommand"]', self._driver)
         self._UPLOAD_FILE_BUTTON = _ElementClickXpath(f'//span[contains(@class, "ms-ContextualMenu-itemText") and text()="Files"]', self._driver)
         self._MORE_BUTTON = _ElementClickXpath(f'//i[@data-icon-name="More"]', self._driver)
-        self._KEEP_BOTH_FILE_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Keep both"]', self._driver)
-        self._KEEP_ALL_FILE_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Keep all"]', self._driver)
-        self._REPLACE_FILE_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace"]', self._driver)
-        self._REPLACE_ALL_BUTTON = _ElementClickXpath(f'//span[@data-automationid="splitbuttonprimary" and text()="Replace all"]', self._driver)
+        self._KEEP_BOTH_FILE_BUTTON = _ElementClickXpath(f'//span[contains(@class, "ms-Button-flexContainer") and text()="Keep both"]', self._driver)
+        self._KEEP_ALL_FILE_BUTTON = _ElementClickXpath(f'//span[contains(@class, "ms-Button-flexContainer") and text()="Keep all"]', self._driver)
+        self._REPLACE_FILE_BUTTON = _ElementClickXpath(f'//span[contains(@class, "ms-Button-flexContainer") and text()="Replace"]', self._driver)
+        self._REPLACE_ALL_BUTTON = _ElementClickXpath(f'//span[contains(@class, "ms-Button-flexContainer") and text()="Replace all"]', self._driver)
         self._SUCCESS_SINGLE_ALERT_XPATH = '//label[contains(@class, "od-Notify-message")]'
         self._SUCCESS_MULTIPLE_ALERT_XPATH = '//div[contains(@class, "title_7bf3db39")]'
-        self._FILE_EXISTS_ALERT_XPATH = '//span[@data-automationid="splitbuttonprimary" and contains(text(), "Keep")]'
+        self._FILE_EXISTS_ALERT_XPATH = '//span[contains(@class, "ms-Button-flexContainer") and contains(text(), "Keep")]'
 
     def _login(self):
         self._driver.get(self._sharepoint_url)
