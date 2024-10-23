@@ -133,7 +133,7 @@ class SharepointerSelenium:
         else:
             print(f'Tempo esgotado para o download do arquivo {file_name_with_ext}')
 
-    def upload_file(self, local_files_path: str | WindowsPath | list, sharepoint_folder_url: str, replace: bool = None, wait_upload_time: int = 60) -> None:
+    def upload_file(self, local_files_path: str | WindowsPath | list, sharepoint_folder_url: str, replace: bool = None, max_attempts: int = 60) -> bool:
         '''
         # Descrição
         Realiza o upload de um ou mais arquivos a um Sharepoint específico
@@ -159,15 +159,23 @@ class SharepointerSelenium:
             - **True**: Sobrescreva
             - **False**: Mantenha ambos
 
-        wait_download_time : int (opcional)
-            - Tempo máximo de espera para realização do download
-            em segundos
-            - Por padrão, este valor estará como 60 segundos
-            - Caso passe deste tempo, o código entenderá que houve
-            algum erro
+        max_attempts : int (opcional)
+            - Quantidade de tentativas para encontrar o alerta de
+            sucesso no upload ou no aviso de arquivo com mesmo nome
+            - Por padrão, este valor estará como 60 tentativas
+            - Caso realizar todas as tentativas sem sucesso em encontrar
+            os alertas, o código entenderá que houve algum erro
             - Ajuste este valor em caso de arquivos muito pesados
-            que possam levar mais de 60 segundos, caso contrário,
-            a aplicação interromperá o donwload
+            que possam levar mais de 60 ciclos, mas, este número deve
+            atender a grande maioria das situações
+
+        Returns
+        ----------
+        True
+            - Operação realizada com sucesso
+
+        False
+            - Operação não realizada
         '''
         if self._logged == False:
             self._login()
@@ -183,52 +191,56 @@ class SharepointerSelenium:
             return str(Path(path).resolve())
 
         def _configure_upload_settings(local_files_path: str | WindowsPath | list) -> tuple:
-
-            def _calculate_timeout(num_files: int, min_time_out: float, max_time_out: float, increment_per_file: float) -> float:
-                time_out = min_time_out + (num_files - 1) * increment_per_file
-                return min(max(time_out, min_time_out), max_time_out)
-
-            MIN_TIME_OUT = 3
-            MAX_TIME_OUT = 30
-            INCREMENT_PER_FILE = 1
-
             if isinstance(local_files_path, (str, WindowsPath)) or (isinstance(local_files_path, list) and len(local_files_path) == 1):
                 local_files_path = _get_absolute_path(local_files_path[0] if isinstance(local_files_path, list) else local_files_path)
                 success_xpath = self._SUCCESS_SINGLE_ALERT_XPATH
                 replace_button = self._REPLACE_FILE_BUTTON
                 keep_button = self._KEEP_BOTH_FILE_BUTTON
-                file_exists_time_out = MIN_TIME_OUT
             else:
                 local_files_path = [_get_absolute_path(path) for path in local_files_path]
                 success_xpath = self._SUCCESS_MULTIPLE_ALERT_XPATH
                 replace_button = self._REPLACE_ALL_BUTTON
                 keep_button = self._KEEP_ALL_FILE_BUTTON
-                file_exists_time_out = _calculate_timeout(len(local_files_path), MIN_TIME_OUT, MAX_TIME_OUT, INCREMENT_PER_FILE)
             
-            return local_files_path, success_xpath, replace_button, keep_button, file_exists_time_out
+            return local_files_path, success_xpath, replace_button, keep_button
 
-        local_files_path, success_xpath, replace_button, keep_button, file_exists_time_out = _configure_upload_settings(local_files_path)
+        local_files_path, success_xpath, replace_button, keep_button = _configure_upload_settings(local_files_path)
         upload_element.send_keys(local_files_path if isinstance(local_files_path, str) else '\n'.join(local_files_path))
 
-        # Caso encontrar arquivos de mesmo nome
-        try:
-            # Alerta de arquivo existente
-            self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=file_exists_time_out)
-            
-            if replace == None:
-                replace = self._input_replace()
+        for attempt in range(max_attempts):
+            try:
+                # Verifica se o alerta de arquivo existente aparece
+                if self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=5):
 
-            if replace:
-                replace_button.click()
-            else:
-                keep_button.click()
-        except:
-            pass
+                    if replace is None:
+                        replace = self._input_replace()
 
-        if self._wait_for_file_upload(success_xpath, wait_upload_time):
-            print(f'Upload do(s) arquivo(s) concluído(s).')
-        else:
-            print(f'Tempo esgotado para o upload do(s) arquivo(s)')
+                    if replace:
+                        print("Substituindo o arquivo...")
+                        replace_button.click()
+                    else:
+                        print("Mantendo o arquivo existente...")
+                        keep_button.click()
+
+                    # Após lidar com o alerta, aguarda o upload do arquivo
+                    if self._wait_for_file_upload(success_xpath, 1000):
+                        print("Upload do(s) arquivo(s) concluído(s)")
+                        return True
+                else:
+                    # Se o alerta não aparecer, verifica se o upload foi concluído diretamente
+                    if self._wait_for_file_upload(success_xpath, 3):
+                        print("Upload do(s) arquivo(s) concluído(s)")
+                        return True
+
+            except Exception:
+                pass
+
+            # Se nenhum elemento foi encontrado e o loop ainda está em andamento, continua tentando
+            print(f"#{attempt + 1} - Buscando: Aguardando alerta de sucesso ou arquivo de mesmo nome...")
+
+        print(f"Máximo de tentativas ({max_attempts}) alcançado. Upload falhou.")
+        
+        return False
 
     # Métodos do objeto
     # ----------------------------------------------------------------------
