@@ -210,30 +210,30 @@ class SharepointerSelenium:
         for attempt in range(max_attempts):
             try:
                 # Verifica se o alerta de arquivo existente aparece
-                if self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=5):
+                self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=3)
 
-                    if replace is None:
-                        replace = self._input_replace()
+                if replace is None:
+                    replace = self._input_replace()
 
-                    if replace:
-                        print("Substituindo o arquivo...")
-                        replace_button.click()
-                    else:
-                        print("Mantendo o arquivo existente...")
-                        keep_button.click()
-
-                    # Após lidar com o alerta, aguarda o upload do arquivo
-                    if self._wait_for_file_upload(success_xpath, 1000):
-                        print("Upload do(s) arquivo(s) concluído(s)")
-                        return True
+                if replace:
+                    print("Substituindo o arquivo...")
+                    replace_button.click()
                 else:
-                    # Se o alerta não aparecer, verifica se o upload foi concluído diretamente
-                    if self._wait_for_file_upload(success_xpath, 3):
-                        print("Upload do(s) arquivo(s) concluído(s)")
-                        return True
+                    print("Mantendo o arquivo existente...")
+                    keep_button.click()
 
+                # Após lidar com o alerta, aguarda o upload do arquivo
+                if self._wait_for_file_upload(success_xpath, 1000):
+                    print("Upload do(s) arquivo(s) concluído(s)")
+                    return True
+                
             except Exception:
-                pass
+                # Se o alerta não aparecer, verifica se o upload foi concluído diretamente
+                if self._wait_for_file_upload(success_xpath, 3):
+                    print("Upload do(s) arquivo(s) concluído(s)")
+                    return True      
+                else:
+                    pass
 
             # Se nenhum elemento foi encontrado e o loop ainda está em andamento, continua tentando
             print(f"#{attempt + 1} - Buscando: Aguardando alerta de sucesso ou arquivo de mesmo nome...")
