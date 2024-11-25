@@ -210,7 +210,7 @@ class SharepointerSelenium:
         for attempt in range(max_attempts):
             try:
                 # Verifica se o alerta de arquivo existente aparece
-                self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=3)
+                self._wait_by_xpath(self._FILE_EXISTS_ALERT_XPATH, time_out=2)
 
                 if replace is None:
                     replace = self._input_replace()
@@ -229,7 +229,7 @@ class SharepointerSelenium:
                 
             except Exception:
                 # Se o alerta não aparecer, verifica se o upload foi concluído diretamente
-                if self._wait_for_file_upload(success_xpath, 3):
+                if self._wait_for_file_upload(success_xpath, 2):
                     print("Upload do(s) arquivo(s) concluído(s)")
                     return True      
                 else:
